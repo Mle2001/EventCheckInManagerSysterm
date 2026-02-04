@@ -38,11 +38,16 @@ import toast from 'react-hot-toast'
 import { layoutAPI, guestsAPI, reportsAPI } from '../../services/api'
 import { useSocket } from '../../hooks/useSocket'
 
-// Canvas dimensions - responsive based on device
-const getCanvasDimensions = (isMobile, isTablet) => {
-  if (isMobile) return { width: 800, height: 600 }
-  if (isTablet) return { width: 1200, height: 900 }
-  return { width: 2000, height: 1500 }
+// Canvas dimensions - ALWAYS 2000x1500 to preserve table positions
+// We adjust SCALE instead to fit different screen sizes
+const CANVAS_WIDTH = 2000
+const CANVAS_HEIGHT = 1500
+
+// Calculate appropriate scale based on device viewport
+const getInitialScale = (isMobile, isTablet) => {
+  if (isMobile) return 0.25   // 2000 * 0.25 = 500px wide (fits mobile screen)
+  if (isTablet) return 0.35    // 2000 * 0.35 = 700px wide
+  return 0.5                   // 2000 * 0.5 = 1000px wide (desktop)
 }
 
 // Seat Component with click handler - optimized for mobile
@@ -149,24 +154,26 @@ export default function CheckInView() {
   const isMobile = useBreakpointValue({ base: true, lg: false })
   const isTablet = useBreakpointValue({ base: false, md: true, lg: false })
 
-  // Get responsive canvas dimensions
-  const canvasDimensions = useMemo(() =>
-    getCanvasDimensions(isMobile, isTablet),
+  // Calculate initial scale based on device - canvas always 2000x1500
+  const initialScale = useMemo(() =>
+    getInitialScale(isMobile, isTablet),
     [isMobile, isTablet]
   )
-  const CANVAS_WIDTH = canvasDimensions.width
-  const CANVAS_HEIGHT = canvasDimensions.height
 
   const [search, setSearch] = useState('')
   const [selectedGuest, setSelectedGuest] = useState(null)
-  const [scale, setScale] = useState(isMobile ? 0.5 : 0.4)
+  const [scale, setScale] = useState(initialScale)
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
   const stageRef = useRef(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
 
+  // Update scale when device changes
+  useEffect(() => {
+    setScale(initialScale)
+  }, [initialScale])
+
   const handleResetView = () => {
-    const defaultScale = isMobile ? 0.5 : 0.4
-    setScale(defaultScale)
+    setScale(initialScale)
     setStagePos({ x: 0, y: 0 })
     if (stageRef.current) {
       stageRef.current.position({ x: 0, y: 0 })
@@ -517,7 +524,11 @@ export default function CheckInView() {
         {/* Layout View */}
         <Card flex={1} w="100%">
           <CardBody p={2}>
-            <Box position="relative" h={{ base: '500px', md: '600px', lg: 'auto' }} maxH={{ base: 'calc(100vh - 200px)', lg: 'calc(100vh - 300px)' }}>
+            <Box
+              position="relative"
+              h={{ base: '500px', md: '600px', lg: 'auto' }}
+              maxH={{ base: 'calc(100vh - 200px)', lg: 'calc(100vh - 300px)' }}
+            >
               <Box
                 border="2px"
                 borderColor="gray.300"
@@ -526,6 +537,19 @@ export default function CheckInView() {
                 bg="white"
                 w="100%"
                 h="100%"
+                sx={{
+                  // Smooth scrolling on mobile
+                  WebkitOverflowScrolling: 'touch',
+                  // Show scrollbars on mobile for better UX
+                  '&::-webkit-scrollbar': {
+                    width: '8px',
+                    height: '8px',
+                  },
+                  '&::-webkit-scrollbar-thumb': {
+                    background: '#CBD5E0',
+                    borderRadius: '4px',
+                  },
+                }}
               >
                 {layoutData?.tables && layoutData.tables.length > 0 ? (
                   <>
