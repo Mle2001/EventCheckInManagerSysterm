@@ -1,5 +1,23 @@
 """
 FastAPI dependencies for authentication and authorization.
+
+Role-Based Access Control (RBAC) Implementation:
+- get_current_user: Validates JWT token, extracts user info
+- get_current_active_user: Ensures user account is active
+- get_current_admin_user: Requires admin or super_admin role
+- get_current_super_admin_user: Requires super_admin role only
+
+Security Features:
+- Bearer token authentication (HTTP Authorization header)
+- Token expiration validation
+- Role-based authorization
+- Inactive user blocking
+
+OWASP Compliance:
+- A01:2021 – Broken Access Control: Strict role verification
+- A07:2021 – Identification and Authentication Failures: Multi-layer auth checks
+
+Updated: 2025-01-XX
 """
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

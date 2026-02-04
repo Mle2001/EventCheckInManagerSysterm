@@ -1,5 +1,16 @@
 """
 Security utilities for password hashing and JWT token management.
+
+Security Implementation:
+- Password Hashing: bcrypt via passlib (secure, slow hashing prevents brute force)
+- JWT Tokens: HS256 algorithm with configurable expiration
+- Token Validation: Automatic expiration checking and signature verification
+
+OWASP Compliance:
+- A02:2021 – Cryptographic Failures: Strong password hashing with bcrypt
+- A07:2021 – Identification and Authentication Failures: Secure token-based auth
+
+Updated: 2025-01-XX
 """
 from datetime import datetime, timedelta
 from typing import Optional
