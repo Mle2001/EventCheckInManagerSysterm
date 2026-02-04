@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Stage, Layer, Circle, Rect, Group, Text as KonvaText } from 'react-konva'
@@ -31,14 +31,22 @@ import {
   StatLabel,
   StatNumber,
   SimpleGrid,
+  useBreakpointValue,
 } from '@chakra-ui/react'
 import { FiSearch, FiArrowLeft, FiCheck, FiX, FiLogOut } from 'react-icons/fi'
 import toast from 'react-hot-toast'
 import { layoutAPI, guestsAPI, reportsAPI } from '../../services/api'
 import { useSocket } from '../../hooks/useSocket'
 
-// Seat Component with click handler
-const SeatShape = ({ seat, table, guest, onClick }) => {
+// Canvas dimensions - responsive based on device
+const getCanvasDimensions = (isMobile, isTablet) => {
+  if (isMobile) return { width: 800, height: 600 }
+  if (isTablet) return { width: 1200, height: 900 }
+  return { width: 2000, height: 1500 }
+}
+
+// Seat Component with click handler - optimized for mobile
+const SeatShape = memo(({ seat, table, guest, onClick, isMobile }) => {
   const getColor = () => {
     if (!guest) return '#cbd5e0' // Gray - unassigned
     if (guest.checked_in) return '#48bb78' // Green - checked in
@@ -57,22 +65,22 @@ const SeatShape = ({ seat, table, guest, onClick }) => {
         radius={30}
         fill="transparent"
       />
-      {/* Visible Seat */}
+      {/* Visible Seat - shadow disabled on mobile for performance */}
       <Circle
         radius={14}
         fill={getColor()}
         stroke="#ffffff"
         strokeWidth={2}
-        shadowBlur={guest ? 5 : 0}
+        shadowBlur={!isMobile && guest ? 5 : 0}
         shadowColor="black"
         shadowOpacity={0.3}
       />
     </Group>
   )
-}
+})
 
-// Table Component for display
-const TableDisplay = ({ table, guests, onSeatClick }) => {
+// Table Component for display - memoized for performance
+const TableDisplay = memo(({ table, guests, onSeatClick, isMobile }) => {
   return (
     <Group
       x={table.position.x}
@@ -123,28 +131,42 @@ const TableDisplay = ({ table, guests, onSeatClick }) => {
             table={table}
             guest={guest}
             onClick={onSeatClick}
+            isMobile={isMobile}
           />
         )
       })}
     </Group>
   )
-}
+})
 
 export default function CheckInView() {
   const { eventId } = useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const socket = useSocket(eventId)
-  
+
+  // Responsive breakpoints
+  const isMobile = useBreakpointValue({ base: true, lg: false })
+  const isTablet = useBreakpointValue({ base: false, md: true, lg: false })
+
+  // Get responsive canvas dimensions
+  const canvasDimensions = useMemo(() =>
+    getCanvasDimensions(isMobile, isTablet),
+    [isMobile, isTablet]
+  )
+  const CANVAS_WIDTH = canvasDimensions.width
+  const CANVAS_HEIGHT = canvasDimensions.height
+
   const [search, setSearch] = useState('')
   const [selectedGuest, setSelectedGuest] = useState(null)
-  const [scale, setScale] = useState(0.4)
+  const [scale, setScale] = useState(isMobile ? 0.5 : 0.4)
   const [stagePos, setStagePos] = useState({ x: 0, y: 0 })
   const stageRef = useRef(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
 
   const handleResetView = () => {
-    setScale(0.4)
+    const defaultScale = isMobile ? 0.5 : 0.4
+    setScale(defaultScale)
     setStagePos({ x: 0, y: 0 })
     if (stageRef.current) {
       stageRef.current.position({ x: 0, y: 0 })
@@ -495,7 +517,7 @@ export default function CheckInView() {
         {/* Layout View */}
         <Card flex={1} w="100%">
           <CardBody p={2}>
-            <Box position="relative" h={{ base: '400px', lg: 'auto' }} maxH="calc(100vh - 300px)">
+            <Box position="relative" h={{ base: '500px', md: '600px', lg: 'auto' }} maxH={{ base: 'calc(100vh - 200px)', lg: 'calc(100vh - 300px)' }}>
               <Box
                 border="2px"
                 borderColor="gray.300"
@@ -508,8 +530,8 @@ export default function CheckInView() {
                 {layoutData?.tables && layoutData.tables.length > 0 ? (
                   <>
                     <Stage
-                      width={2000 * scale}
-                      height={1500 * scale}
+                      width={CANVAS_WIDTH * scale}
+                      height={CANVAS_HEIGHT * scale}
                       scaleX={scale}
                       scaleY={scale}
                       x={stagePos.x}
@@ -527,6 +549,7 @@ export default function CheckInView() {
                             table={table}
                             guests={guests}
                             onSeatClick={handleSeatClick}
+                            isMobile={isMobile}
                           />
                         ))}
                       </Layer>
